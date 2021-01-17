@@ -30,38 +30,43 @@
   (cl-labels
       ((rec (pat-chars result)
 	    (pcase pat-chars
-	      ((pred null) (nreverse result))
-	      (`(?* . ,tail) (rec tail (cons ".*" result)))
-	      (`(?? . ,tail) (rec tail (cons "." result)))
+	      ((pred null) (reverse result))
+	      (`(?* . ,tail) (rec tail (cons '(* not-newline)
+					     result)))
+	      (`(?? . ,tail) (rec tail (cons 'not-newline
+					     result)))
 	      ((and `(?\\ . ,tail)
 		    (guard (not (null tail))))
-	       (rec (cdr tail) (cons (char-to-string (car tail)) result)))
+	       (rec (cdr tail) (cons (char-to-string (car tail))
+				     result)))
 	      ((and `(?\[ . ,tail)
 		    (app (member ?\]) rest)
 		    (guard (not (null rest))))
 	       (rec (cdr rest)
-		    (cons (concat
-			   "["
-			   (cl-loop for c in tail
-				    until (= c ?\])
-				    collect c)
-			   "]")
+		    (cons (list 'in (concat
+				     (cl-loop for c in tail
+					      until (= c ?\])
+					      collect c)))
 			  result)))
 	      ((and `(?\{ . ,tail)
 		    (app (member ?\}) rest)
 		    (guard (not (null rest))))
 	       (rec (cdr rest)
-		    (cons (concat
-			   "("
-			   (cl-loop for c in tail
-				    until (= c ?\})
-				    if (= c ?,) collect ?|
-				    else if (not (= c ? )) collect c)
-			   ")")
+		    (cons (cons 'or
+				(split-string (concat
+					       (cl-loop for c in tail
+							until (= c ?\})
+							if (not (= c ? )) collect c)) ","))
 			  result)))
 	      (`(,c . ,tail)
-	       (rec tail (cons (char-to-string c) result))))))
-    (rec (string-to-list pat) nil)))
+	       (rec tail (cons (char-to-string c)
+			       result)))))
+       (exec-rx (pseq)
+		(eval `(rx (seq line-start
+				,@pseq
+				line-end)))))
+    (exec-rx
+     (rec (string-to-list pat) nil))))
 
 (defun kill-buffers-with (pat type)
   (interactive (list (read-string "Pattern: ")
