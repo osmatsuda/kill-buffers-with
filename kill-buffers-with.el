@@ -68,13 +68,41 @@
     (exec-rx
      (rec (string-to-list pat) nil))))
 
+(defun kill-buffers-with--type (name)
+  (cond
+   ((string= "buffer" name)
+    #'(lambda (regexp buffer)
+	(string-match regexp (buffer-name buffer))))
+   ((string= "mode" name)
+    #'(lambda (regexp buffer)
+	(let ((mode-name (buffer-local-value 'mode-name buffer)))
+	  (unless (stringp mode-name) (setq mode-name ""))
+	  (string-match regexp mode-name))))
+   ((string= "file" name)
+    #'(lambda (regexp buffer)
+	(string-match regexp
+		      (abbreviate-file-name
+		       (or (buffer-file-name buffer)
+			   (buffer-local-value 'list-buffers-directory buffer)
+			   "")))))
+   (t (error ""))))
+
 (defun kill-buffers-with (pat type)
   (interactive (list (read-string "Pattern: ")
-		     (completing-read "Select name type (defulat: buffer): "
+		     (completing-read "Select name type: "
 				      '("buffer" "file" "mode")
-				      nil t nil nil "buffer")))
-  (message "%s %s" pat type))
+				      nil t)))
+  (let ((regexp (pattern2regexp pat))
+	(match (kill-buffers-with--type type)))
+    (loop for b in (buffer-list)
+	  for bn = (buffer-name b)
+	  with targets = nil
+	  when (and (not (string= " " (substring bn 0 1)))
+		    (funcall match regexp b))
+	  collect bn into targets
+	  and do (kill-buffer b)
+	  finally (when targets
+		    (message "killed buffers %S" targets)))))
 
 (provide 'kill-buffers-with)
 ;;; kill-buffers-with.el ends here
-
