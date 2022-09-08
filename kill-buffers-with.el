@@ -1,6 +1,6 @@
 ;;; kill-buffers-with.el ---                         -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2021  osmatsuda
+;; Copyright (C) 2022  osmatsuda
 
 ;; Author: osmatsuda;;  <osmatsuda@gmail.com>
 ;; Keywords: convenience
@@ -20,14 +20,15 @@
 
 ;;; Commentary:
 
-;; 
+;; Kill buffers at once with a pattern.
+;;   https://github.com/osmatsuda/kill-buffers-with
 
 ;;; Code:
 
 (require 'cl-lib)
 
 (defun pattern2regexp (pat)
-  ""
+  "Convert a glob pattern to a regular expression."
   (cl-labels
       ((rec (pat-chars result)
             (pcase pat-chars
@@ -93,17 +94,18 @@
                      (completing-read "Select name type: "
                                       '("buffer" "file" "mode")
                                       nil t)))
-  (let ((regexp (pattern2regexp pat))
-        (match (kill-buffers-with--type type)))
-    (loop for b in (buffer-list)
-          for bn = (buffer-name b)
-          with targets = nil
-          when (and (not (string= " " (substring bn 0 1)))
-                    (funcall match regexp b))
-          collect bn into targets
-          and do (kill-buffer b)
-          finally (when targets
-                    (message "Killed buffers %S" targets)))))
+  (let* ((regexp (pattern2regexp pat))
+         (match (kill-buffers-with--type type))
+	 (killed-buffers
+	  (cl-loop for b in (buffer-list)
+		   for bn = (buffer-name b)
+		   when (and (not (string= " " (substring bn 0 1)))
+			     (funcall match regexp b))
+		   collect bn
+		   and do (kill-buffer b)
+		   )))
+    (when killed-buffers
+      (message "Killed buffers %S" killed-buffers))))
 
 (provide 'kill-buffers-with)
 ;;; kill-buffers-with.el ends here
